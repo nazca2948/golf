@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ゴルフボール耐久</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* layout idea: one object on a plain plate, nothing else competing with it */
+  :root {
+    --paper: #eceff3;
+    --ink: #14202e;
+    --muted: #596678;
+    --line: #cdd4dd;
+    --accent: #d4421f;
+    --font-body: 'Zen Kaku Gothic New', 'Hiragino Sans', 'Yu Gothic', 'Noto Sans JP', sans-serif;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #0e141b; --ink: #e7ecf2; --muted: #93a0b0; --line: #273343; --accent: #ff7b57;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #0e141b; --ink: #e7ecf2; --muted: #93a0b0; --line: #273343; --accent: #ff7b57;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--paper); color: var(--ink); font-family: var(--font-body);
+    font-size: 15px; line-height: 1.7; -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+  /* whole page = one viewport: the ball area takes whatever height is left over */
+  /* left: ball + bar; right: shop column, which only exists once "menu" has been typed */
+  .app {
+    height: 100vh; height: 100dvh; max-width: 1100px; margin: 0 auto;
+    display: flex; gap: 20px; padding: 8px 16px 10px;
+  }
+  .app.shop-on { max-width: 1320px; }
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .ballbox { flex: 1; min-height: 0; }
+  .bar { flex: none; display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--line); padding-top: 8px; }
+  .row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 16px; }
+  .app:not(.shop-on) .row.locked { display: none; }   /* pins + shake toggle come with the shop */
+  .side {
+    flex: none; width: 290px; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+    display: flex; flex-direction: column; gap: 14px; padding-top: 6px;
+  }
+  .side[hidden] { display: none; }
+  @media (max-width: 700px) {
+    .app { flex-direction: column; gap: 10px; }
+    .side { width: auto; max-height: 38dvh; order: 2; padding-top: 0; }
+  }
+  .money { font-size: 15px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .money b { font-size: 26px; color: var(--ink); font-weight: 700; margin: 0 2px; transition: color .2s; }
+  .money.neg b { color: var(--accent); }
+  .money .delta { display: inline-block; min-width: 5em; margin-left: 8px; font-size: 13px; color: var(--accent); opacity: 0; transition: opacity .6s; }
+  .money .delta.show { opacity: 1; transition: none; }
+  .panel { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+  .panel h2 { margin: 0 0 8px; font-size: 14px; font-weight: 700; letter-spacing: 0.06em; }
+  .shop { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+  .shop li { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-top: 1px solid var(--line); font-size: 14px; }
+  .shop li:first-child { border-top: 0; }
+  .shop .name { flex: 1; min-width: 0; }
+  .shop .name small { display: block; font-size: 12px; color: var(--muted); line-height: 1.4; }
+  .shop .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,.28); }
+  .buy { font: inherit; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--paper); background: var(--ink); border: 0; border-radius: 6px; padding: 3px 10px; cursor: pointer; white-space: nowrap; }
+  .buy:hover:not(:disabled) { background: var(--accent); }
+  .buy:disabled { background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); cursor: default; }
+  .buy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .answer { display: flex; gap: 8px; flex: 0 1 260px; }
+  .answer input { flex: 1; min-width: 0; font: inherit; font-size: 15px; padding: 4px 8px; color: var(--ink); background: transparent; border: 1px solid var(--line); border-radius: 6px; }
+  .answer input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .note { margin: 0; font-size: 13px; color: var(--muted); flex: 1 1 200px; text-align: right; }
+  .note.good { color: #27a05a; font-weight: 700; }
+  .note.bad { color: var(--accent); }
+  canvas#ball { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+  canvas#ball:active { cursor: grabbing; }
+  .rule { margin: 0; font-size: 14px; }
+  .check { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; font-size: 14px; }
+  .check input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
+  .check input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0; font-size: 13px; color: var(--muted); }
+  .palette { display: flex; flex-wrap: wrap; gap: 8px; }
+  .sw { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--ink); background: transparent; padding: 2px 10px 2px 4px; border: 1px solid var(--line); border-radius: 999px; cursor: pointer; }
+  .sw .dot { width: 18px; height: 18px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.28); }
+  .sw[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+  .sw.empty .cnt { color: var(--muted); }
+  .sw:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .check input:disabled + span { color: var(--muted); }
+  .reset { font: inherit; font-size: 13px; color: var(--ink); background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 2px 12px; cursor: pointer; }
+  .reset:hover { border-color: var(--muted); }
+  .reset:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+ <div class="main">
+  <div class="ballbox">
+    <canvas id="ball" role="img" aria-label="白い窪みが規則的に並んだ球。右クリックで窪みにピンを刺し、ホイールでピンの色を変えられます。ドラッグで回転できます"></canvas>
+  </div>
+  <div class="bar">
+    <div class="row locked" id="pinRow">
+      <div class="tools">
+        <span>ピン</span>
+        <div class="palette" id="palette" role="group" aria-label="ピンの色と残り本数（ホイールでも変更できます）"></div>
+        <button type="button" class="reset" id="reset">全部抜く</button>
+      </div>
+      <label class="check"><input type="checkbox" id="auto" checked disabled><span id="autoLabel">手振れ（要解除）</span></label>
+    </div>
+    <div class="row">
+      <form class="answer" id="answerForm" autocomplete="off">
+        <input type="number" id="answer" min="0" step="1" inputmode="numeric" placeholder="窪みの数" aria-label="窪みの数">
+        <button type="submit" class="buy" id="answerBtn">解答する</button>
+      </form>
+      <p class="note" id="answerMsg" aria-live="polite"></p>
+    </div>
+  </div>
+ </div>
+  <aside class="side" id="side" aria-label="ショップ" hidden>
+    <div class="money" id="money" aria-live="polite">所持金<b id="moneyVal">1,280</b>円<span class="delta" id="moneyDelta"></span></div>
+    <section class="panel" aria-labelledby="shopTitle">
+      <h2 id="shopTitle">ショップ</h2>
+      <ul class="shop" id="shop"></ul>
+    </section>
+    <section class="panel">
+      <p class="rule">不正解だと答えた数と同じ金額の罰金</p>
+    </section>
+  </aside>
+</div>
+
+<script src="dimple_ball.js?v=5"></script>
+</body>
+</html>
